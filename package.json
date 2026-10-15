@@ -1,0 +1,11 @@
+{
+  "name": "ts-checker-chokidar4-lost-edit",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@rspack/core": "2.2.3",
+    "typescript": "7.0.2",
+    "ts-checker-rspack-plugin": "1.7.1",
+    "ts-checker-rspack-plugin-1.6.2": "npm:ts-checker-rspack-plugin@1.6.2"
+  }
+}
