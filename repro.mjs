@@ -3,6 +3,8 @@
 //
 //   node repro.mjs [plugin] [runs]
 //
+// Prints one line per run, then PASS or FAIL. Exits 1 when a save was lost.
+//
 // plugin: ts-checker-rspack-plugin (1.7.1, default), ts-checker-rspack-plugin-1.6.2, or none
 // DELAY:   ms between the first compile's callback and the save (default 5)
 // MODULES: modules in their own directories under src/ (default 30)
@@ -19,6 +21,12 @@ const modules = Number(process.env.MODULES ?? 30);
 const { rspack } = require("@rspack/core");
 const { TsCheckerRspackPlugin } = pluginName === "none" ? {} : require(pluginName);
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const version = (name) => require(`${name}/package.json`).version;
+
+const plugin = pluginName === "none" ? "no plugin" : `ts-checker-rspack-plugin ${version(pluginName)}`;
+console.log(`${plugin}, @rspack/core ${version("@rspack/core")}, typescript ${version("typescript")}`);
+console.log(`${process.platform} ${process.arch}, Node ${process.version}`);
+console.log(`${runs} runs, each saving src/a.ts ${delay} ms after the first compile, with ${modules} module directories\n`);
 
 let rebuilt = 0;
 for (let run = 0; run < Number(runs); run++) {
@@ -70,6 +78,7 @@ for (let run = 0; run < Number(runs); run++) {
   });
 
   let compiles = 0;
+  let savedAt = 0;
   const secondCompile = new Promise((resolve) => {
     compiler.watch({}, () => {
       compiles += 1;
@@ -78,14 +87,26 @@ for (let run = 0; run < Number(runs); run++) {
           // An atomic save, as editors do.
           fs.writeFileSync(join(root, "src/a.ts.tmp"), "export const a: number = 2;\n");
           fs.renameSync(join(root, "src/a.ts.tmp"), join(root, "src/a.ts"));
+          savedAt = Date.now();
         }, delay);
       }
       if (compiles === 2) resolve(true);
     });
   });
-  if (await Promise.race([secondCompile, sleep(5000).then(() => false)])) rebuilt += 1;
+  const label = `run ${String(run + 1).padStart(String(runs).length)}/${runs}`;
+  if (await Promise.race([secondCompile, sleep(5000).then(() => false)])) {
+    rebuilt += 1;
+    console.log(`${label}: ok, rebuilt ${Date.now() - savedAt} ms after the save`);
+  } else {
+    console.log(`${label}: LOST, no rebuild within 5 s of the save`);
+  }
   await new Promise((resolve) => compiler.close(resolve));
   fs.rmSync(root, { recursive: true, force: true });
 }
-console.log(`${pluginName}, DELAY=${delay}, MODULES=${modules}: rebuilt after the save in ${rebuilt}/${runs}`);
-process.exit(0);
+const lost = Number(runs) - rebuilt;
+console.log(
+  lost === 0
+    ? `\nPASS: ${plugin} rebuilt after every save (${rebuilt}/${runs})`
+    : `\nFAIL: ${plugin} lost ${lost} of ${runs} saves (rebuilt ${rebuilt}/${runs})`,
+);
+process.exit(lost === 0 ? 0 : 1);

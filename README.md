@@ -13,7 +13,22 @@ node repro.mjs ts-checker-rspack-plugin-1.6.2   # 1.6.2: every save rebuilds
 node repro.mjs none                             # no plugin: every save rebuilds
 ```
 
-Each run creates an app with 30 modules in their own directories under `src/`. It starts rspack in watch mode, then saves `src/a.ts` 5 ms after the first compile's callback. The script prints in how many runs a second compile followed the save.
+Each run creates an app with 30 modules in their own directories under `src/`. It starts rspack in watch mode, then saves `src/a.ts` 5 ms after the first compile's callback. A run is `ok` when a second compile follows the save, and `LOST` when none follows within 5 s. The script ends with `PASS` or `FAIL`, and exits 1 when a save was lost:
+
+```
+$ node repro.mjs ts-checker-rspack-plugin 5
+ts-checker-rspack-plugin 1.7.1, @rspack/core 2.2.3, typescript 7.0.2
+darwin arm64, Node v24.20.0
+5 runs, each saving src/a.ts 5 ms after the first compile, with 30 module directories
+
+run 1/5: ok, rebuilt 185 ms after the save
+run 2/5: ok, rebuilt 181 ms after the save
+run 3/5: LOST, no rebuild within 5 s of the save
+run 4/5: LOST, no rebuild within 5 s of the save
+run 5/5: LOST, no rebuild within 5 s of the save
+
+FAIL: ts-checker-rspack-plugin 1.7.1 lost 3 of 5 saves (rebuilt 2/5)
+```
 
 To move the save, set `DELAY=<ms>`. To change the number of module directories, set `MODULES=<n>`.
 
